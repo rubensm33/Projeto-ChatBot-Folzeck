@@ -1,5 +1,3 @@
-
-
 from typing import Literal, Optional
 from uuid import uuid4
 from fastapi import FastAPI, HTTPException, Depends
@@ -7,7 +5,8 @@ from pydantic import BaseModel
 import models
 from database import engine, SessionLocal
 from sqlalchemy.orm import Session
-
+from sqlalchemy import update
+from models import Users
 app = FastAPI()
 
 models.Base.metadata.create_all(bind=engine)
@@ -30,8 +29,7 @@ class User(BaseModel):
 class PatchUser(BaseModel):
     name: Optional[str] 
     lastname: Optional [str] 
-    user_id: Optional[str] 
-    age: Optional [int] 
+    age: Optional[int] 
     genre: Optional[Literal["Male", "Female"]]
 
 
@@ -44,6 +42,7 @@ class PatchUser(BaseModel):
 @app.get("/")
 async def home():
     return {"message":"Folzeck Group"}
+
 
 # /list-users -> List all users
 @app.get("/list-users")
@@ -105,22 +104,11 @@ async def put_user(user: User, index: int, db: Session = Depends(get_db)):
 
 # /upadate-partially-user -> Update User Partially by Index
 @app.patch("/patch-user/{index}")
-async def patch_user(index: int, user: PatchUser, db: Session = Depends(get_db)):
-
-    user_model = db.query(models.Users).filter(models.Users.user_id == index).first()
-    
-    if user_model is None:
-        raise HTTPException(
-            status_code=404,
-            detail=f"ID {index} : Does not exist"
-        )
-
-
-    db.update(user_model)
-    db.commit()
-
-    return user
-
+async def patch_user(index: int, patch_user: PatchUser, db: Session = Depends(get_db)):
+   update_query = (update(Users)).values(patch_user.dict(exclude_unset=True)).where(Users.user_id == index)
+   db.execute(update_query)
+   db.commit()
+   return "USUARIO ATUALIZADO" 
 
 
 
