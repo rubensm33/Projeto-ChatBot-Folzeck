@@ -21,12 +21,18 @@ def get_db():
         db.close()
 
 class User(BaseModel):
-    name: str
+    name: str 
     lastname: str
-    user_id: Optional[str] = uuid4().hex
+    user_id: Optional[str]
     age: int
     genre: Literal["Male", "Female"]
 
+class PatchUser(BaseModel):
+    name: Optional[str] 
+    lastname: Optional [str] 
+    user_id: Optional[str] 
+    age: Optional [int] 
+    genre: Optional[Literal["Male", "Female"]]
 
 
 
@@ -74,7 +80,8 @@ async def add_user(user: User, db: Session = Depends(get_db)):
 
     return user
     
-@app.put("/put-user")
+# /upadate-user -> Update User by Index
+@app.put("/put-user/{index}")
 async def put_user(user: User, index: int, db: Session = Depends(get_db)):
 
     user_model = db.query(models.Users).filter(models.Users.user_id == index).first()
@@ -85,7 +92,6 @@ async def put_user(user: User, index: int, db: Session = Depends(get_db)):
             detail=f"ID {index} : Does not exist"
         )
 
-    user_model = models.Users()
     user_model.name = user.name
     user_model.lastname = user.lastname
     user_model.age = user.age
@@ -95,6 +101,28 @@ async def put_user(user: User, index: int, db: Session = Depends(get_db)):
     db.commit()
 
     return user
+
+
+# /upadate-partially-user -> Update User Partially by Index
+@app.patch("/patch-user/{index}")
+async def patch_user(index: int, user: PatchUser, db: Session = Depends(get_db)):
+
+    user_model = db.query(models.Users).filter(models.Users.user_id == index).first()
+    
+    if user_model is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"ID {index} : Does not exist"
+        )
+
+
+    db.update(user_model)
+    db.commit()
+
+    return user
+
+
+
 
 # /delete-user-by-index/{index} -> Delete User by Index
 @app.delete("/delete-user-by-index/{index}")
