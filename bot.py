@@ -23,12 +23,7 @@ logger = logging.getLogger(__name__)
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ApplicationBuilder, Application, CommandHandler, ContextTypes, ConversationHandler, MessageHandler, filters
 
-NAME, LASTNAME, AGE, GENRE = range(4)
-
-
-
-
-
+NAME, LASTNAME, AGE, GENRE, RETRIEVE = range(5)
 
 
 
@@ -45,6 +40,8 @@ async def create(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
     )
     return NAME
 
+
+
 async def name(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
     #Stores the name
     
@@ -59,6 +56,8 @@ async def name(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
     )
     return LASTNAME
 
+
+
 async def lastname(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
     
     context.user_data["lastname"] = update.message.text    
@@ -71,6 +70,8 @@ async def lastname(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
         
     )
     return AGE
+
+
 
 async def age(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
 
@@ -93,6 +94,7 @@ async def age(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
         
     ))
     return GENRE
+
 
 
 async def genre(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -123,14 +125,14 @@ async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
 
 
 
-
-
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     await update.message.reply_text(f'Welcome to Folzeck Bot, please type /help to know the commands')
 
+
+
 async def help(update: Update,context: ContextTypes.DEFAULT_TYPE)-> None:
 
-    reply_help=[["/start", "/help", "/create"]]
+    reply_help=[["/start", "/help", "/create", "/retrieve", "/retrieve_by_index"]]
 
     await update.message.reply_text("""
     The following commands are available:
@@ -138,6 +140,8 @@ async def help(update: Update,context: ContextTypes.DEFAULT_TYPE)-> None:
     /start -> Welcome to the channel
     /help -> This message
     /create -> Create New User
+    /retrieve -> List All
+    /retrieve_by_index -> List User By Index
 
     """,
     reply_markup=ReplyKeyboardMarkup(
@@ -145,12 +149,39 @@ async def help(update: Update,context: ContextTypes.DEFAULT_TYPE)-> None:
      
      )
 
+
+
 async def retrieve(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
 
-    await update.message.reply_text(f'These are all users')
-    retrieve = httpx.get('http://127.0.0.1:8000/list-users',)
-    retrieve
+    retrieve = httpx.get('http://127.0.0.1:8000/list-users')
+    dict_format = 'Name: {name}\nLastname: {lastname}\nAge: {age}\nGenre: {genre}'
+
+    users = "".join([dict_format.format_map(user) + "\n" for user in retrieve.json()])
+
+    await update.message.reply_text(f'These are all users\n\n{users}')      
+    
+    
     return ConversationHandler.END
+
+
+
+async def retrieve_by_index(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
+
+    await update.message.reply_text(f'Select an user by Index')
+    
+    return RETRIEVE
+
+
+
+async def return_retrieve(update: Update, context: ContextTypes.DEFAULT_TYPE)-> None:
+    reply_user = update.message.text
+
+    retrieve = httpx.get(f'http://127.0.0.1:8000/list-user-by-index/{reply_user}')
+
+    await update.message.reply_text(f'These are the user selected\n\n{retrieve.text}')
+
+    return ConversationHandler.END 
+
 
 
 def main() -> None:
@@ -176,14 +207,27 @@ def main() -> None:
         fallbacks=[CommandHandler("cancel", cancel)],
     )
 
+    conv_retrieve = ConversationHandler(
+        entry_points=[CommandHandler("retrieve_by_index", retrieve_by_index)],
+        states={
+            RETRIEVE: [MessageHandler(filters.TEXT, return_retrieve)],
+        },
+        fallbacks=[CommandHandler("cancel", cancel)],
+    
+    
+    )
+
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("help", help))
     app.add_handler(CommandHandler("retrieve", retrieve))
+    app.add_handler(conv_retrieve)
     
     app.add_handler(conv_handler)
 
     # Run the bot until the user presses Ctrl-C
     app.run_polling()
+
+
 
 if __name__ == "__main__":
     main()
